@@ -1,0 +1,108 @@
+﻿fw01
+        em0 is WAN, em1 is LAN
+        For the WAN, your upstream gateway is 10.0.17.2
+        Your LAN IP Address is 10.0.5.2
+        Hostname: fw1-yourfirstname
+        Domain: yourfirstname.local
+        Primary DNS: 8.8.8.8
+        RFC1918 Networks:  Uncheck "Block private networks from entering via WAN"
+
+
+wks01
+        rename computer
+        lusrmgr.msc to make new users
+        ip configuration time (change to dhcp and set dns later)
+        stop until domain user accounts aare created in ad01
+        set dns to 10.0.5.5
+        member of domain: adam
+        restart wks01
+        #after setting up dhcp, enable it in ip config settings
+
+
+ad01
+        set ip stuff
+        very quickly make sure discoverable
+Failed? Computer Config>Windows Settings folder>Security Settings>Network List Manager Policies.
+        change the name of computer in server manager
+        if adds not installed:
+                manage>add roles and features
+                check active directory domain services
+                restart destination server, click yes.
+                promote server to domain controller
+                new forest, adam.local
+                enter drsm password
+                log in with domain admin next time
+        DNS
+                DNS>right click AD01-ADAM>DNS Manager
+                reverse lookup zone>new zone
+                10.0.5.X
+                go down to adam.local in forward lookup zone, right click, new host (A or AAAA)
+                fw01-adam, 10.0.5.2, update associated pointer record
+                ad01-adam, 10.0.5.5, update associated pointer record
+        AD DS
+                AD DS>right click AD01-ADAM>Active Directory Users and Computers
+                go to Users, right click, new>User
+                make a admin user, add to group 'Domain Admins'
+                make a normal user.
+                #come back here after DHCP setup is done.
+                right click adam.local>new>OU
+                make it called SYS255
+                make 3 more sub OUs (Users, Computers, Groups)
+                make some users (alice, bob, charlie)
+                move the computer from Computers the the new Computers OU.
+                add a global security group called custom-desktop.
+                custom-desktop>properties>put just alice and bob in there.
+        Group Policy Management
+                Tools>Group Policy Management
+                create GPO in SYS255 OU
+                make it apply to custom-desktop and remove 'Authenticated Users'
+                add Domain Computers instead, and give it only read permissions
+                edit the GPO
+                user config> administrative temp...>Desktop>remove recycle bin>enable
+                do same thing again in Computers OU, but set...
+                computer config>policies>windows settings>security settings>local policies>security options>don't display last sign-in>enable
+
+
+dhcp01
+        #start after wks01 joins domain.
+        nmtui
+                IP Address and Netmask 
+                        10.0.5.3/24
+                Gateway
+                        10.0.5.2
+                DNS
+                        10.0.5.5
+                Search Domain
+                        adam.local
+                Hostname
+                        dhcp01-adam
+        systemctl restart network
+        useradd adam
+        passwd adam
+        usermod -aG wheel adam
+        #everything on dhcp01 beyond here is done over ssh
+        #ad01 bit
+                disable IE enhanced security for admins (server manager)
+                good luck getting IE open LMAO
+                remember how bad IE is, then get over it and install putty.
+                use putty from ad01 to ssh into dhcp01. 
+        #log in as your new account
+        sudo yum install dhcp
+        sudo -i
+        nano /etc/dhcp/dhcpd.conf
+        #or use vi if insane
+        #very carefully here, add:
+        
+                subnet 10.0.5.0 netmask 255.255.255.0 {
+                        option routers 10.0.5.2;
+                        option subnet-mask 255.255.255.0;
+                        option domain-name "adam.local";
+                        option domain-name-servers 10.0.5.5;
+                        range 10.0.5.100 10.0.5.150
+                }
+        
+        #remember to save
+        systemctl start dhcpd
+        systemctl enable dhcpd
+        firewall-cmd --add-service=dhcp --permanent
+        firewall-cmd --reload
