@@ -18,7 +18,7 @@ wget https://releases.wikimedia.org/mediawiki/1.38/mediawiki-1.38.4.tar.gz
 tar xf  mediawiki*.tar.gz 
 mv mediawiki-1.32.0/* /var/www/html/
 mysql -u root -p 
-CREATE DATABASE media_wiki;
+CREATE DATABASE media_wiki; identified by '[PASSWORD]';
 CREATE USER 'media_wiki'@'web01-adam'
 GRANT ALL PRIVILEGES on media_wiki.* to 'media_wiki’@'web01-adam';
 quit;
